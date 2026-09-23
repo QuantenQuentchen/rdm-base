@@ -9,7 +9,7 @@
 
 import type { EntityId } from './types'
 
-const DEBUG_STORAGE_KEY = 'vanguard.debug'
+const DEBUG_STORAGE_KEY = 'rdm.debug'
 
 export interface DebugFlags {
   /** Skip auth entirely and sign in as a fixture user. */
@@ -97,8 +97,8 @@ export const config = {
   },
 
   brand: {
-    name: 'The Vanguard Awards',
-    shortName: 'Vanguard',
+    name: 'Working Title Awards',
+    shortName: 'Working',
     edition: 'MMXXVI',
     tagline: 'Honouring the year in play.',
   },

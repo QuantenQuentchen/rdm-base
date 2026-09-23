@@ -84,7 +84,7 @@ func NewLoginAttemptStore() *LoginAttemptStore {
 	}
 }
 
-var discordOAuth = &oauth2.Config{
+/*var discordOAuth = &oauth2.Config{
 	ClientID:     mustEnv("DISCORD_CLIENT_ID"),
 	ClientSecret: mustEnv("DISCORD_CLIENT_SECRET"),
 	RedirectURL:  "http://localhost:8080/api/auth/discord/callback",
@@ -96,23 +96,48 @@ var discordOAuth = &oauth2.Config{
 	},
 
 	Scopes: []string{"identify"},
-}
+}*/
 
 type AuthStruct struct {
 	loginAttempts *LoginAttemptStore
 	discordClient *DiscordClient
+	oAuthConfig   *oauth2.Config
 	db            *DB
+	local         bool
 }
 
-func NewAuthStruct() (*AuthStruct, error) {
+func NewAuthStruct(local bool) (*AuthStruct, error) {
 	db, err := NewDB()
 	if err != nil {
 		return nil, err
 	}
+
+	var redirectURL string
+
+	if local {
+		redirectURL = "http://localhost:8080/api/auth/discord/callback"
+	} else {
+		redirectURL = "https://nudelauflauf.ddns.net/api/auth/discord/callback"
+	}
+
+	discordOAuth := &oauth2.Config{
+		ClientID:     mustEnv("DISCORD_CLIENT_ID"),
+		ClientSecret: mustEnv("DISCORD_CLIENT_SECRET"),
+		RedirectURL:  redirectURL,
+		Endpoint: oauth2.Endpoint{
+			AuthURL:   "https://discord.com/oauth2/authorize",
+			TokenURL:  "https://discord.com/api/v10/oauth2/token",
+			AuthStyle: oauth2.AuthStyleInHeader,
+		},
+		Scopes: []string{"identify"},
+	}
+
 	return &AuthStruct{
 		loginAttempts: NewLoginAttemptStore(),
 		discordClient: NewDiscordClient(),
+		oAuthConfig:   discordOAuth,
 		db:            db,
+		local:         local,
 	}, nil
 }
 
@@ -152,7 +177,7 @@ func (a *AuthStruct) loginDiscord(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   300,
 	})
 
-	url := discordOAuth.AuthCodeURL(
+	url := a.oAuthConfig.AuthCodeURL(
 		state,
 		oauth2.S256ChallengeOption(verifier),
 	)
@@ -200,7 +225,7 @@ func (a *AuthStruct) discordCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Exchange Discord's authorization code for tokens.
-	token, err := discordOAuth.Exchange(
+	token, err := a.oAuthConfig.Exchange(
 		r.Context(),
 		r.URL.Query().Get("code"),
 		oauth2.VerifierOption(attempt.Verifier),
@@ -245,16 +270,28 @@ func (a *AuthStruct) discordCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "session_token",
-		Value:    sessionToken,
-		Path:     "/",
-		HttpOnly: true,
-		//TODO: this
-		Secure:   false, // localhost; true in production
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   86400 * 7, // A week, in seconds
-	})
+	if a.local {
+		http.SetCookie(w, &http.Cookie{
+			Name:     "session_token",
+			Value:    sessionToken,
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   false,
+			SameSite: http.SameSiteLaxMode,
+			MaxAge:   86400 * 7, // A week, in seconds
+		})
+	} else {
+		http.SetCookie(w, &http.Cookie{
+			Name:     "session_token",
+			Value:    sessionToken,
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   true,
+			SameSite: http.SameSiteLaxMode,
+			MaxAge:   86400 * 7, // A week, in seconds
+		})
+	}
+
 	http.Redirect(w, r, "/", http.StatusFound)
 	w.WriteHeader(http.StatusOK)
 }
@@ -283,8 +320,6 @@ func (a *AuthStruct) getSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	usrReply, err := a.generateUserReply(r.Context(), usr.DiscordID)
-	//log.Print("usrReply: ", usrReply)
-	//log.Print("userReply img: ", *usrReply.AvatarURL)
 	if err != nil {
 		log.Printf("failed to generate user reply: %v\n", err)
 		http.Error(w, "failed to generate user reply", http.StatusInternalServerError)
@@ -320,16 +355,28 @@ func (a *AuthStruct) logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "session_token",
-		Value:    "",
-		Path:     "/",
-		HttpOnly: true,
-		//TODO: this
-		Secure:   false, // localhost; true in production
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   -1,
-	})
+	if a.local {
+		http.SetCookie(w, &http.Cookie{
+			Name:     "session_token",
+			Value:    "",
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   false,
+			SameSite: http.SameSiteLaxMode,
+			MaxAge:   -1,
+		})
+	} else {
+		http.SetCookie(w, &http.Cookie{
+			Name:     "session_token",
+			Value:    "",
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   true,
+			SameSite: http.SameSiteLaxMode,
+			MaxAge:   -1,
+		})
+	}
+
 	return
 }
 
