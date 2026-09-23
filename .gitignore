@@ -1,0 +1,9 @@
+rdm-backend/.data.db
+rdm-backend/.data.db-shm
+rdm-backend/.data.db-wal
+rmd-backend/.env
+
+rdm-frontend/dist
+rdm-frontend/.idea
+rdm-frontend/node_modules
+rdm-frontend/.vscode
