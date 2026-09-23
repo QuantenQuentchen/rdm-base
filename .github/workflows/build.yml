@@ -43,6 +43,10 @@ jobs:
       working-directory: rdm-backend
       run: go test -v ./...
 
+    - name: Frontend Install
+      working-directory: rdm-frontend
+      run: npm install
+
     - name: Test Frontend
       working-directory: rdm-frontend
       run: npm ci
