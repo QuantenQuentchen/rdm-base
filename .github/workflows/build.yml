@@ -101,5 +101,6 @@ jobs:
 #        fingerprint: ${{ secrets.VPS_FINGERPRINT }}
         envs: SERVICE
         script: |
+          echo "SERVICE=[$SERVICE]"
           sudo -S systemctl restart "$SERVICE"
           sudo -S systemctl is-active --quiet "$SERVICE"
