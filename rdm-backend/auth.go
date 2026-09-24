@@ -145,17 +145,27 @@ func (a *AuthStruct) loginDiscord(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     "discord_login_attempt",
-		Value:    attemptID,
-		Path:     "/",
-		HttpOnly: true,
-		//TODO: this
-		Secure:   false, // localhost; true in production
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   300,
-	})
+	if a.local {
+		http.SetCookie(w, &http.Cookie{
+			Name:     "discord_login_attempt",
+			Value:    attemptID,
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   false,
+			SameSite: http.SameSiteLaxMode,
+			MaxAge:   300,
+		})
+	} else {
+		http.SetCookie(w, &http.Cookie{
+			Name:     "discord_login_attempt",
+			Value:    attemptID,
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   true,
+			SameSite: http.SameSiteLaxMode,
+			MaxAge:   300,
+		})
+	}
 
 	url := a.oAuthConfig.AuthCodeURL(
 		state,
@@ -254,17 +264,17 @@ func (a *AuthStruct) discordCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//if a.local {
-	http.SetCookie(w, &http.Cookie{
-		Name:     "session_token",
-		Value:    sessionToken,
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   false,
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   86400 * 7, // A week, in seconds
-	})
-	/*} else {
+	if a.local {
+		http.SetCookie(w, &http.Cookie{
+			Name:     "session_token",
+			Value:    sessionToken,
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   false,
+			SameSite: http.SameSiteLaxMode,
+			MaxAge:   86400 * 7, // A week, in seconds
+		})
+	} else {
 		http.SetCookie(w, &http.Cookie{
 			Name:     "session_token",
 			Value:    sessionToken,
@@ -274,7 +284,7 @@ func (a *AuthStruct) discordCallback(w http.ResponseWriter, r *http.Request) {
 			SameSite: http.SameSiteLaxMode,
 			MaxAge:   86400 * 7, // A week, in seconds
 		})
-	}*/
+	}
 
 	http.Redirect(w, r, "/", http.StatusFound)
 	w.WriteHeader(http.StatusOK)
@@ -339,17 +349,17 @@ func (a *AuthStruct) logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//if a.local {
-	http.SetCookie(w, &http.Cookie{
-		Name:     "session_token",
-		Value:    "",
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   false,
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   -1,
-	})
-	/*} else {
+	if a.local {
+		http.SetCookie(w, &http.Cookie{
+			Name:     "session_token",
+			Value:    "",
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   false,
+			SameSite: http.SameSiteLaxMode,
+			MaxAge:   -1,
+		})
+	} else {
 		http.SetCookie(w, &http.Cookie{
 			Name:     "session_token",
 			Value:    "",
@@ -359,7 +369,7 @@ func (a *AuthStruct) logout(w http.ResponseWriter, r *http.Request) {
 			SameSite: http.SameSiteLaxMode,
 			MaxAge:   -1,
 		})
-	}*/
+	}
 
 	return
 }

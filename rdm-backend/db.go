@@ -1,13 +1,14 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"os"
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	_ "modernc.org/sqlite"
+	"modernc.org/sqlite"
 )
 
 type DB struct {
@@ -35,7 +36,18 @@ func NewDB() (*DB, error) {
 	return db, nil
 }
 
-// TODO: Pragma apparently connection specific
+func init() {
+	sqlite.RegisterConnectionHook(func(conn sqlite.ExecQuerierContext, dsn string) error {
+		_, err := conn.ExecContext(context.Background(), `
+			PRAGMA foreign_keys = ON;
+			PRAGMA busy_timeout = 5000;
+			PRAGMA synchronous = NORMAL;
+		`, nil)
+
+		return err
+	})
+}
+
 func (db *DB) initDB() error {
 	var err error
 
@@ -48,23 +60,15 @@ func (db *DB) initDB() error {
 	db.db.SetMaxIdleConns(8)
 	db.db.SetConnMaxLifetime(time.Hour)
 
-	if err := db.db.Ping(); err != nil {
+	// WAL is a database-level setting, so initialize it once.
+	if _, err := db.db.Exec(`PRAGMA journal_mode = WAL`); err != nil {
 		_ = db.db.Close()
 		return err
 	}
 
-	pragmas := []string{
-		`PRAGMA journal_mode = WAL`,
-		`PRAGMA synchronous = NORMAL`,
-		`PRAGMA foreign_keys = ON`,
-		`PRAGMA busy_timeout = 5000`,
-	}
-
-	for _, pragma := range pragmas {
-		if _, err := db.db.Exec(pragma); err != nil {
-			_ = db.db.Close()
-			return err
-		}
+	if err := db.db.Ping(); err != nil {
+		_ = db.db.Close()
+		return err
 	}
 
 	return nil
