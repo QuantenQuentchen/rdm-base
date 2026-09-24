@@ -106,5 +106,5 @@ jobs:
           whoami
           tty || true
           sudo -n -l
-          sudo -n /usr/bin/systemctl restart "$SERVICE"
-          sudo -n /usr/bin/systemctl is-active --quiet "$SERVICE"
+          sudo -n /usr/bin/systemctl restart "rdm"
+          sudo -n /usr/bin/systemctl is-active --quiet "rdm"
