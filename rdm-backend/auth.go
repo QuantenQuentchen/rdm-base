@@ -240,7 +240,7 @@ func (a *AuthStruct) discordCallback(w http.ResponseWriter, r *http.Request) {
 
 	member, err := a.discordClient.GetGuildMember(r.Context(), testServerID, user.ID)
 	if err != nil {
-		http.Error(w, "failed to get guild member", http.StatusInternalServerError)
+		http.Error(w, "failed to get guild member: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 

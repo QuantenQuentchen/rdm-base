@@ -102,12 +102,4 @@ jobs:
 #        fingerprint: ${{ secrets.VPS_FINGERPRINT }}
         envs: SERVICE
         script: |
-          echo "--- rule check"
-          sudo -n -l /usr/bin/systemctl restart rdm;  echo "restart rc=$?"
-          sudo -n -l /usr/bin/systemctl is-active --quiet rdm;  echo "is-active(--quiet) rc=$?"
-          sudo -n -l /usr/bin/systemctl is-active rdm;  echo "is-active rc=$?"
-          echo "--- environment"
-          command -v systemctl; readlink -f "$(command -v systemctl)"
-          echo "--- did the restart actually happen?"
-          systemctl show rdm -p ActiveEnterTimestamp
-          date
+          sudo -n /usr/bin/systemctl restart rdm
