@@ -102,5 +102,7 @@ jobs:
         envs: SERVICE
         script: |
           echo "SERVICE=[$SERVICE]"
-          sudo -S systemctl restart "$SERVICE"
-          sudo -S systemctl is-active --quiet "$SERVICE"
+          command -v systemctl
+          sudo -n -l
+          sudo -n /usr/bin/systemctl restart "$SERVICE"
+          sudo -n systemctl is-active --quiet "$SERVICE"
