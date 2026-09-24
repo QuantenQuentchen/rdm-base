@@ -75,6 +75,7 @@ jobs:
 #        fingerprint: ${{ secrets.VPS_FINGERPRINT }}
         source: "rdm-frontend/dist/*"
         target: "~/apps/rdm/resources/web/"
+        strip_components: 2
 
 
     - name: Copy binary to server
@@ -86,3 +87,4 @@ jobs:
 #        fingerprint: ${{ secrets.VPS_FINGERPRINT }}
         source: "rdm-backend/server"
         target: "~/apps/rdm/"
+        strip_components: 1
