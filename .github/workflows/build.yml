@@ -38,7 +38,7 @@ jobs:
     - name: Build Backend
       working-directory: rdm-backend
       env:
-        baseUrl: ${{env.PUBLIC_DOMAIN}}
+        baseUrl: ${{vars.PUBLIC_DOMAIN}}
       run: go build -ldflags="-X main.baseUrl=$baseUrl" -o server
 
     - name: Test Backend
@@ -57,12 +57,12 @@ jobs:
       working-directory: rdm-frontend
       run: npm run build
       env:
-        VITE_API_BASE_URL: ${{env.PUBLIC_DOMAIN}}
+        VITE_API_BASE_URL: ${{vars.PUBLIC_DOMAIN}}
 
     - name: Copy to server
       uses: appleboy/scp-action@v1
       with:
-        host: ${{ env.VPS_HOST }}
+        host: ${{ vars.VPS_HOST }}
         username: ${{ secrets.VPS_USER }}
         key: ${{ secrets.VPS_SSH_KEY }}
         fingerprint: ${{ secrets.VPS_FINGERPRINT }}
@@ -73,7 +73,7 @@ jobs:
     - name: Copy binary to server
       uses: appleboy/scp-action@v1
       with:
-        host: ${{ env.VPS_HOST }}
+        host: ${{ vars.VPS_HOST }}
         username: ${{ secrets.VPS_USER }}
         key: ${{ secrets.VPS_SSH_KEY }}
         fingerprint: ${{ secrets.VPS_FINGERPRINT }}
