@@ -102,9 +102,5 @@ jobs:
 #        fingerprint: ${{ secrets.VPS_FINGERPRINT }}
         envs: SERVICE
         script: |
-          echo "SERVICE=[$SERVICE]"
-          whoami
-          tty || true
-          sudo -n -l
-          sudo -n /usr/bin/systemctl restart "rdm"
-          sudo -n /usr/bin/systemctl is-active --quiet "rdm"
+          sudo -n /usr/bin/systemctl restart "$SERVICE"
+          sudo -n /usr/bin/systemctl is-active --quiet "$SERVICE"
