@@ -45,28 +45,33 @@ type GuildMember struct {
 	UnusualDMActivityUntil *string `json:"unusual_dm_activity_until"`
 }
 
+type AvatarDecorationDataObject struct {
+	Asset string `json:"asset"`
+	SkuID string `json:"sku_id"`
+}
+
 // DiscordUser represents Discord's User object.
 //
 // This is intentionally fairly complete so you can use the object
 // for more than just its ID.
 type DiscordUser struct {
-	ID               string  `json:"id"`
-	Username         string  `json:"username"`
-	Discriminator    string  `json:"discriminator"`
-	GlobalName       *string `json:"global_name"`
-	Avatar           *string `json:"avatar"`
-	Bot              bool    `json:"bot,omitempty"`
-	System           bool    `json:"system,omitempty"`
-	MFAEnabled       bool    `json:"mfa_enabled,omitempty"`
-	Banner           *string `json:"banner,omitempty"`
-	AccentColor      *int    `json:"accent_color,omitempty"`
-	Locale           *string `json:"locale,omitempty"`
-	Verified         bool    `json:"verified,omitempty"`
-	Email            *string `json:"email,omitempty"`
-	Flags            int     `json:"flags,omitempty"`
-	PremiumType      *int    `json:"premium_type,omitempty"`
-	PublicFlags      int     `json:"public_flags,omitempty"`
-	AvatarDecoration *string `json:"avatar_decoration_data,omitempty"`
+	ID               string                      `json:"id"`
+	Username         string                      `json:"username"`
+	Discriminator    string                      `json:"discriminator"`
+	GlobalName       *string                     `json:"global_name"`
+	Avatar           *string                     `json:"avatar"`
+	Bot              bool                        `json:"bot,omitempty"`
+	System           bool                        `json:"system,omitempty"`
+	MFAEnabled       bool                        `json:"mfa_enabled,omitempty"`
+	Banner           *string                     `json:"banner,omitempty"`
+	AccentColor      *int                        `json:"accent_color,omitempty"`
+	Locale           *string                     `json:"locale,omitempty"`
+	Verified         bool                        `json:"verified,omitempty"`
+	Email            *string                     `json:"email,omitempty"`
+	Flags            int                         `json:"flags,omitempty"`
+	PremiumType      *int                        `json:"premium_type,omitempty"`
+	PublicFlags      int                         `json:"public_flags,omitempty"`
+	AvatarDecoration *AvatarDecorationDataObject `json:"avatar_decoration_data,omitempty"`
 }
 
 func NewDiscordClient() *DiscordClient {
