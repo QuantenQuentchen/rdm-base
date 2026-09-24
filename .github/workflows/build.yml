@@ -25,6 +25,13 @@ jobs:
         apt-get install -y ca-certificates curl
         update-ca-certificates
 
+    - name: Debug fingerprint
+      env:
+        FP: ${{ secrets.VPS_FINGERPRINT }}
+      run: |
+        printf '%s' "$FP" | sha256sum
+        printf 'length=%s\n' "${#FP}"
+
     - name: Set up Go
       uses: actions/setup-go@v7
       with:
