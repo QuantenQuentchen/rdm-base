@@ -105,4 +105,4 @@ jobs:
           command -v systemctl
           sudo -n -l
           sudo -n /usr/bin/systemctl restart "$SERVICE"
-          sudo -n systemctl is-active --quiet "$SERVICE"
+          sudo -n /usr/bin/systemctl is-active --quiet "$SERVICE"
