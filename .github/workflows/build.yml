@@ -88,3 +88,16 @@ jobs:
         source: "rdm-backend/server"
         target: "~/apps/rdm/"
         strip_components: 1
+
+    - name: Restart the dang thing
+      uses: appleboy/ssh-action@v1
+      env:
+        SERVICE: ${{ vars.SERVICE_NAME }}
+
+      with:
+        host: ${{ vars.VPS_HOST }}
+        username: ${{ secrets.VPS_USER }}
+        key: ${{ secrets.VPS_SSH_KEY }}
+#        fingerprint: ${{ secrets.VPS_FINGERPRINT }}
+        script: |
+          sudo systemctl restart $SERVICE
