@@ -39,7 +39,7 @@ jobs:
       working-directory: rdm-backend
       env:
         baseUrl: ${{env.PUBLIC_DOMAIN}}
-      run: go build -ldflags="-X main.baseUrl=$baseUrl -o server
+      run: go build -ldflags="-X main.baseUrl=$baseUrl" -o server
 
     - name: Test Backend
       working-directory: rdm-backend
