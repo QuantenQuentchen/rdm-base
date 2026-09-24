@@ -98,11 +98,13 @@ jobs:
         host: ${{ vars.VPS_HOST }}
         username: ${{ secrets.VPS_USER }}
         key: ${{ secrets.VPS_SSH_KEY }}
+        request_pty: false
 #        fingerprint: ${{ secrets.VPS_FINGERPRINT }}
         envs: SERVICE
         script: |
           echo "SERVICE=[$SERVICE]"
-          command -v systemctl
+          whoami
+          tty || true
           sudo -n -l
           sudo -n /usr/bin/systemctl restart "$SERVICE"
           sudo -n /usr/bin/systemctl is-active --quiet "$SERVICE"
