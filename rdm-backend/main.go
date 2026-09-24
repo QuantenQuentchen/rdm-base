@@ -7,7 +7,7 @@ import (
 	"strconv"
 )
 
-const baseUrl string = "http://localhost:8080"
+var baseUrl = "http://localhost:8080"
 
 func main() {
 
