@@ -17,7 +17,7 @@ jobs:
     container: debian:13
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
 
     - name: Install system dependencies
       run: |
@@ -26,18 +26,20 @@ jobs:
         update-ca-certificates
 
     - name: Set up Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v7
       with:
         go-version: '1.27'
 
     - name: Set up npm
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v7
       with:
         node-version: 24
 
     - name: Build Backend
       working-directory: rdm-backend
-      run: go build -v ./...
+      env:
+        baseUrl: ${{env.PUBLIC_DOMAIN}}
+      run: go build -ldflags="-X main.baseUrl=$baseUrl -o server
 
     - name: Test Backend
       working-directory: rdm-backend
@@ -54,3 +56,26 @@ jobs:
     - name: Build Frontend
       working-directory: rdm-frontend
       run: npm run build
+      env:
+        VITE_API_BASE_URL: ${{env.PUBLIC_DOMAIN}}
+
+    - name: Copy to server
+      uses: appleboy/scp-action@v1
+      with:
+        host: ${{ env.VPS_HOST }}
+        username: ${{ secrets.VPS_USER }}
+        key: ${{ secrets.VPS_SSH_KEY }}
+        fingerprint: ${{ secrets.VPS_FINGERPRINT }}
+        source: "rdm-frontend/dist/*"
+        target: "~/apps/rdm/resources/web/"
+
+
+    - name: Copy binary to server
+      uses: appleboy/scp-action@v1
+      with:
+        host: ${{ env.VPS_HOST }}
+        username: ${{ secrets.VPS_USER }}
+        key: ${{ secrets.VPS_SSH_KEY }}
+        fingerprint: ${{ secrets.VPS_FINGERPRINT }}
+        source: "rdm-backend/server"
+        target: "~/apps/rdm/"

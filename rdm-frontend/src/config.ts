@@ -93,7 +93,7 @@ export const config = {
      * its own port, so every call is a cross-origin `fetch` with
      * `credentials: 'include'` carrying the session cookie.
      */
-    baseUrl: import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080',
+    baseUrl: import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080', //'http://[2a03:4000:28:343:c45e:fcff:feb0:7472]:8080/',
   },
 
   brand: {

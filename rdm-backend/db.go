@@ -35,6 +35,7 @@ func NewDB() (*DB, error) {
 	return db, nil
 }
 
+// TODO: Pragma apparently connection specific
 func (db *DB) initDB() error {
 	var err error
 

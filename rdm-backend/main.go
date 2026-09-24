@@ -7,6 +7,8 @@ import (
 	"strconv"
 )
 
+const baseUrl string = "http://localhost:8080"
+
 func main() {
 
 	portConfig := flag.Int("port", 8080, "port to listen on")
@@ -24,7 +26,7 @@ func main() {
 	if auth.local {
 		http.Handle("/", http.FileServer(http.Dir("../rdm-frontend/dist")))
 	} else {
-		http.Handle("/", http.FileServer(http.Dir("/resources/web")))
+		http.Handle("/", http.FileServer(http.Dir("./resources/web")))
 	}
 	http.HandleFunc("/api/auth/session", auth.getSession)
 

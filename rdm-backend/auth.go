@@ -84,20 +84,6 @@ func NewLoginAttemptStore() *LoginAttemptStore {
 	}
 }
 
-/*var discordOAuth = &oauth2.Config{
-	ClientID:     mustEnv("DISCORD_CLIENT_ID"),
-	ClientSecret: mustEnv("DISCORD_CLIENT_SECRET"),
-	RedirectURL:  "http://localhost:8080/api/auth/discord/callback",
-
-	Endpoint: oauth2.Endpoint{
-		AuthURL:   "https://discord.com/oauth2/authorize",
-		TokenURL:  "https://discord.com/api/v10/oauth2/token",
-		AuthStyle: oauth2.AuthStyleInHeader,
-	},
-
-	Scopes: []string{"identify"},
-}*/
-
 type AuthStruct struct {
 	loginAttempts *LoginAttemptStore
 	discordClient *DiscordClient
@@ -112,13 +98,7 @@ func NewAuthStruct(local bool) (*AuthStruct, error) {
 		return nil, err
 	}
 
-	var redirectURL string
-
-	if local {
-		redirectURL = "http://localhost:8080/api/auth/discord/callback"
-	} else {
-		redirectURL = "https://nudelauflauf.ddns.net/api/auth/discord/callback"
-	}
+	redirectURL := baseUrl + "/api/auth/discord/callback"
 
 	discordOAuth := &oauth2.Config{
 		ClientID:     mustEnv("DISCORD_CLIENT_ID"),
@@ -225,13 +205,16 @@ func (a *AuthStruct) discordCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Exchange Discord's authorization code for tokens.
+	log.Println("Exchanging code for token...")
+	log.Printf("client ID: %q\n", a.oAuthConfig.ClientID)
+	log.Printf("client secret length: %d\n", len(a.oAuthConfig.ClientSecret))
 	token, err := a.oAuthConfig.Exchange(
 		r.Context(),
 		r.URL.Query().Get("code"),
 		oauth2.VerifierOption(attempt.Verifier),
 	)
 	if err != nil {
-		http.Error(w, "token exchange failed", http.StatusBadRequest)
+		http.Error(w, "token exchange failed: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -241,6 +224,7 @@ func (a *AuthStruct) discordCallback(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to get discord user", http.StatusInternalServerError)
 		return
 	}
+	log.Printf("got discord user: %v\n", user)
 
 	member, err := a.discordClient.GetGuildMember(r.Context(), testServerID, user.ID)
 	if err != nil {
@@ -270,17 +254,17 @@ func (a *AuthStruct) discordCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if a.local {
-		http.SetCookie(w, &http.Cookie{
-			Name:     "session_token",
-			Value:    sessionToken,
-			Path:     "/",
-			HttpOnly: true,
-			Secure:   false,
-			SameSite: http.SameSiteLaxMode,
-			MaxAge:   86400 * 7, // A week, in seconds
-		})
-	} else {
+	//if a.local {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session_token",
+		Value:    sessionToken,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   false,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   86400 * 7, // A week, in seconds
+	})
+	/*} else {
 		http.SetCookie(w, &http.Cookie{
 			Name:     "session_token",
 			Value:    sessionToken,
@@ -290,7 +274,7 @@ func (a *AuthStruct) discordCallback(w http.ResponseWriter, r *http.Request) {
 			SameSite: http.SameSiteLaxMode,
 			MaxAge:   86400 * 7, // A week, in seconds
 		})
-	}
+	}*/
 
 	http.Redirect(w, r, "/", http.StatusFound)
 	w.WriteHeader(http.StatusOK)
@@ -355,17 +339,17 @@ func (a *AuthStruct) logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if a.local {
-		http.SetCookie(w, &http.Cookie{
-			Name:     "session_token",
-			Value:    "",
-			Path:     "/",
-			HttpOnly: true,
-			Secure:   false,
-			SameSite: http.SameSiteLaxMode,
-			MaxAge:   -1,
-		})
-	} else {
+	//if a.local {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session_token",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   false,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   -1,
+	})
+	/*} else {
 		http.SetCookie(w, &http.Cookie{
 			Name:     "session_token",
 			Value:    "",
@@ -375,7 +359,7 @@ func (a *AuthStruct) logout(w http.ResponseWriter, r *http.Request) {
 			SameSite: http.SameSiteLaxMode,
 			MaxAge:   -1,
 		})
-	}
+	}*/
 
 	return
 }
