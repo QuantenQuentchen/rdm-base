@@ -11,6 +11,13 @@ import (
 	"modernc.org/sqlite"
 )
 
+var (
+	ErrCategoryNotFound   = errors.New("category not found")
+	ErrCategoryLocked     = errors.New("category is locked")
+	ErrTooManySuggestions = errors.New("too many suggestions for this category")
+	ErrSuggestionNotFound = errors.New("suggestion not found")
+)
+
 type DB struct {
 	db *sqlx.DB
 }
@@ -51,7 +58,10 @@ func init() {
 func (db *DB) initDB() error {
 	var err error
 
-	db.db, err = sqlx.Open("sqlite", "data.db")
+	// _txlock=immediate makes every BEGIN take the write lock up front, so a
+	// transaction that reads and then writes can't fail with SQLITE_BUSY when
+	// another writer commits in between. busy_timeout covers the waiting.
+	db.db, err = sqlx.Open("sqlite", "file:data.db?_txlock=immediate")
 	if err != nil {
 		return err
 	}
@@ -139,6 +149,23 @@ func (db *DB) Close() error {
 	return db.db.Close()
 }
 
+// withTx runs fn inside a transaction (BEGIN IMMEDIATE, via _txlock).
+// It commits if fn returns nil and rolls back otherwise.
+func (db *DB) withTx(fn func(tx *sqlx.Tx) error) error {
+	tx, err := db.db.Beginx()
+	if err != nil {
+		return err
+	}
+	// After a successful Commit this is a harmless ErrTxDone.
+	defer func() { _ = tx.Rollback() }()
+
+	if err := fn(tx); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
 type User struct {
 	ID        int64  `db:"id"`
 	DiscordID string `db:"discord_id"`
@@ -187,17 +214,24 @@ func (db *DB) getUserByDiscordID(discordID string) (*User, error) {
 	return &user, nil
 }
 
+// getOrCreateUser is a single atomic statement, so concurrent first logins
+// for the same Discord ID can't race. The no-op DO UPDATE is what makes
+// RETURNING yield the existing row on conflict.
 func (db *DB) getOrCreateUser(discordID string) (*User, error) {
-	user, err := db.getUserByDiscordID(discordID)
+	var user User
+
+	err := db.db.Get(
+		&user,
+		`INSERT INTO users (discord_id) VALUES (?)
+		 ON CONFLICT(discord_id) DO UPDATE SET discord_id = excluded.discord_id
+		 RETURNING *`,
+		discordID,
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	if user != nil {
-		return user, nil
-	}
-
-	return db.addAndReturnUser(discordID)
+	return &user, nil
 }
 
 func (db *DB) getUserByID(id int64) (*User, error) {
@@ -319,21 +353,45 @@ func (db *DB) getSuggestionsFor(
 	return suggestions, nil
 }
 
-func (db *DB) addSuggestion(
-	suggestion NominationSuggestion,
+// ---------------------------------------------------------------------------
+// Suggestion helpers. These take a sqlx.Ext so they work on either *sqlx.DB or
+// *sqlx.Tx, and are meant to be called inside withTx.
+// ---------------------------------------------------------------------------
+
+func getCategory(q sqlx.Ext, categoryID int64) (*Category, error) {
+	var category Category
+
+	err := sqlx.Get(q, &category, "SELECT * FROM categories WHERE id = ?", categoryID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrCategoryNotFound
+		}
+		return nil, err
+	}
+
+	return &category, nil
+}
+
+// insertSuggestion always attributes the row to userID, never to whatever the
+// client put in NominatorID.
+func insertSuggestion(
+	q sqlx.Ext,
+	s NominationSuggestion,
+	userID int64,
 ) (*NominationSuggestion, error) {
 	var inserted NominationSuggestion
 
-	err := db.db.Get(
+	err := sqlx.Get(
+		q,
 		&inserted,
 		`INSERT INTO suggestions
 			(category_id, text, updated_at, nominator_id)
 		 VALUES (?, ?, ?, ?)
 		 RETURNING *`,
-		suggestion.CategoryID,
-		suggestion.Text,
-		suggestion.UpdatedAt,
-		suggestion.NominatorID,
+		s.CategoryID,
+		s.Text,
+		s.UpdatedAt,
+		userID,
 	)
 	if err != nil {
 		return nil, err
@@ -342,99 +400,191 @@ func (db *DB) addSuggestion(
 	return &inserted, nil
 }
 
-func (db *DB) updateSuggestion(
-	suggestion NominationSuggestion,
+// updateSuggestion only touches text/updated_at. It can't reassign the owner
+// or move the suggestion to another category (which would dodge limits/locks).
+func updateSuggestion(
+	q sqlx.Ext,
+	s NominationSuggestion,
 	userID int64,
 ) (*NominationSuggestion, error) {
 	var updated NominationSuggestion
 
-	err := db.db.Get(
+	err := sqlx.Get(
+		q,
 		&updated,
 		`UPDATE suggestions
-		 SET category_id = ?,
-		     text = ?,
-		     updated_at = ?,
-		     nominator_id = ?
+		 SET text = ?,
+		     updated_at = ?
 		 WHERE id = ?
 		   AND nominator_id = ?
+		   AND category_id = ?
 		 RETURNING *`,
-		suggestion.CategoryID,
-		suggestion.Text,
-		suggestion.UpdatedAt,
-		suggestion.NominatorID,
-		suggestion.ID,
+		s.Text,
+		s.UpdatedAt,
+		*s.ID,
 		userID,
+		s.CategoryID,
 	)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrSuggestionNotFound
+		}
 		return nil, err
 	}
 
 	return &updated, nil
 }
 
+func saveSuggestion(
+	q sqlx.Ext,
+	s NominationSuggestion,
+	userID int64,
+) (*NominationSuggestion, error) {
+	if s.ID == nil || *s.ID == 0 {
+		return insertSuggestion(q, s, userID)
+	}
+
+	return updateSuggestion(q, s, userID)
+}
+
+// upsertSuggestion saves a single suggestion for userID, enforcing the
+// locked flag and max_suggestions (per user, per category) atomically.
 func (db *DB) upsertSuggestion(
 	suggestion NominationSuggestion,
 	userID int64,
 ) (*NominationSuggestion, error) {
-	if suggestion.ID == nil || *suggestion.ID == 0 {
-		return db.addSuggestion(suggestion)
-	}
+	var result *NominationSuggestion
 
-	return db.updateSuggestion(suggestion, userID)
-}
-
-func (db *DB) deleteSuggestion(suggestionID int64) error {
-	_, err := db.db.Exec(
-		"DELETE FROM suggestions WHERE id = ?",
-		suggestionID,
-	)
-
-	return err
-}
-
-func (db *DB) upsertSuggestions(
-	suggestions []NominationSuggestion,
-	categoryID int64,
-	userID int64,
-) error {
-	keepSuggestionIDs := make([]int64, 0, len(suggestions))
-
-	for _, suggestion := range suggestions {
-		inserted, err := db.upsertSuggestion(suggestion, userID)
+	err := db.withTx(func(tx *sqlx.Tx) error {
+		category, err := getCategory(tx, suggestion.CategoryID)
 		if err != nil {
 			return err
 		}
+		if category.Locked {
+			return ErrCategoryLocked
+		}
 
-		keepSuggestionIDs = append(
-			keepSuggestionIDs,
-			*inserted.ID,
-		)
-	}
+		isNew := suggestion.ID == nil || *suggestion.ID == 0
+		if isNew && category.MaxSuggestions != nil {
+			var count int
+			err := sqlx.Get(
+				tx,
+				&count,
+				`SELECT COUNT(*) FROM suggestions
+				 WHERE category_id = ? AND nominator_id = ?`,
+				category.ID,
+				userID,
+			)
+			if err != nil {
+				return err
+			}
+			if count >= *category.MaxSuggestions {
+				return ErrTooManySuggestions
+			}
+		}
 
-	// Empty list means: delete every suggestion in this category.
-	if len(keepSuggestionIDs) == 0 {
-		_, err := db.db.Exec(
-			"DELETE FROM suggestions WHERE category_id = ?",
-			categoryID,
-		)
+		suggestion.UpdatedAt = time.Now()
+
+		result, err = saveSuggestion(tx, suggestion, userID)
 		return err
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	// sqlx.In expands the slice into (?, ?, ?, ...).
-	query, args, err := sqlx.In(
+	return result, nil
+}
+
+// deleteSuggestion only deletes userID's own suggestion, and only while its
+// category is unlocked.
+func (db *DB) deleteSuggestion(suggestionID int64, userID int64) error {
+	res, err := db.db.Exec(
 		`DELETE FROM suggestions
-		 WHERE category_id = ?
-		   AND id NOT IN (?)`,
-		categoryID,
-		keepSuggestionIDs,
+		 WHERE id = ?
+		   AND nominator_id = ?
+		   AND category_id IN (SELECT id FROM categories WHERE locked = 0)`,
+		suggestionID,
+		userID,
 	)
 	if err != nil {
 		return err
 	}
 
-	// We're using SQLite, so '?' is already the correct placeholder.
-	_, err = db.db.Exec(query, args...)
-	return err
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrSuggestionNotFound
+	}
+
+	return nil
+}
+
+// upsertSuggestions replaces userID's suggestions in categoryID with the given
+// list, atomically. Other users' suggestions are never touched.
+func (db *DB) upsertSuggestions(
+	suggestions []NominationSuggestion,
+	categoryID int64,
+	userID int64,
+) error {
+	return db.withTx(func(tx *sqlx.Tx) error {
+		category, err := getCategory(tx, categoryID)
+		if err != nil {
+			return err
+		}
+		if category.Locked {
+			return ErrCategoryLocked
+		}
+		if category.MaxSuggestions != nil && len(suggestions) > *category.MaxSuggestions {
+			return ErrTooManySuggestions
+		}
+
+		now := time.Now()
+		keepIDs := make([]int64, 0, len(suggestions))
+
+		for _, s := range suggestions {
+			// Never trust these from the client.
+			s.CategoryID = categoryID
+			s.UpdatedAt = now
+
+			saved, err := saveSuggestion(tx, s, userID)
+			if err != nil {
+				return err
+			}
+
+			keepIDs = append(keepIDs, *saved.ID)
+		}
+
+		// Empty list means: delete all of *this user's* suggestions in this category.
+		if len(keepIDs) == 0 {
+			_, err := tx.Exec(
+				`DELETE FROM suggestions
+				 WHERE category_id = ?
+				   AND nominator_id = ?`,
+				categoryID,
+				userID,
+			)
+			return err
+		}
+
+		// sqlx.In expands the slice into (?, ?, ?, ...).
+		query, args, err := sqlx.In(
+			`DELETE FROM suggestions
+			 WHERE category_id = ?
+			   AND nominator_id = ?
+			   AND id NOT IN (?)`,
+			categoryID,
+			userID,
+			keepIDs,
+		)
+		if err != nil {
+			return err
+		}
+
+		_, err = tx.Exec(query, args...)
+		return err
+	})
 }
 
 func (db *DB) getSuggestionsOf(

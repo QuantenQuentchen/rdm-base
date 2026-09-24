@@ -98,10 +98,6 @@ func NewAuthStruct(local bool) (*AuthStruct, error) {
 		return nil, err
 	}
 
-	if !local && baseUrl == "http://localhost:8080" {
-		log.Print("WARNING: baseUrl is set to localhost in production mode. This may cause issues with Discord OAuth2.")
-	}
-
 	log.Print("baseUrl: ", baseUrl)
 
 	redirectURL := baseUrl + "/api/auth/discord/callback"
