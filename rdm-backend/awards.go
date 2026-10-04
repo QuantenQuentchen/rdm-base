@@ -127,7 +127,9 @@ func (a *AuthStruct) handleCategoryUpsert(w http.ResponseWriter, r *http.Request
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-
+	if req.ID != nil {
+		req.Category.ID = *req.ID
+	}
 	err = a.db.upsertCategory(req.Category)
 	if err != nil {
 		http.Error(w, "failed to upsert category", http.StatusInternalServerError)

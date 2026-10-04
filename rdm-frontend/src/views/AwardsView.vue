@@ -32,8 +32,8 @@ function onSave(categoryId: EntityId, entries: SuggestionDraft[]): void {
       <h1 class="display masthead__title">{{ config.brand.name }}</h1>
       <div class="masthead__rule" aria-hidden="true" />
       <p class="masthead__lede">
-        Nominations are open to the floor. Put forward the games, studios and performances that
-        defined the year — the jury takes it from there.
+        Nominations are open to the floor. Put forward the games, media and experiences that
+        defined the year, the decade, the century, or humanity — the jury takes it from there.
       </p>
     </header>
 

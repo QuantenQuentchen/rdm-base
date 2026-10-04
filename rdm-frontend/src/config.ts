@@ -100,7 +100,7 @@ export const config = {
     name: 'Working Title Awards',
     shortName: 'Working',
     edition: 'MMXXVI',
-    tagline: 'Honouring the year in play.',
+    tagline: 'Awarding, awards, and recognition.',
   },
 
   suggestions: {

@@ -43,6 +43,10 @@ export interface Suggestion {
   updatedAt?: string
 }
 
+export interface SuggestionReorderRequest {
+  order: Map<EntityId, number>
+}
+
 /** A row in the editor. `id` is null until the backend assigns one. */
 export interface SuggestionDraft {
   id: EntityId | null
