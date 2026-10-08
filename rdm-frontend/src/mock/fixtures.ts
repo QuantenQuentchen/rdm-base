@@ -11,6 +11,7 @@ export const mockUser: User = {
 export const mockCategories: Category[] = [
   {
     id: 'goty',
+    order: 1,
     name: 'Game of the Year',
     description: 'The single finest game of the season, judged across every discipline.',
     criteria: 'Any title released between 1 January and 30 November. Re-releases are not eligible.',
@@ -18,49 +19,58 @@ export const mockCategories: Category[] = [
   },
   {
     id: 'direction',
+    order: 2,
     name: 'Outstanding Direction',
     description: 'For the creative vision that held an entire production together.',
     criteria: 'Name the game; the jury identifies the credited director.',
   },
   {
     id: 'narrative',
+    order: 3,
     name: 'Achievement in Narrative',
     description: 'Writing, structure and character work that lingered after the credits.',
   },
   {
     id: 'art-direction',
+    order: 4,
     name: 'Distinguished Art Direction',
     description: 'Visual identity, world-building and the discipline behind a coherent look.',
   },
   {
     id: 'score',
+    order: 5,
     name: 'Original Score and Sound',
     description: 'Composition, sound design and the craft of making a world audible.',
   },
   {
     id: 'performance',
+    order: 6,
     name: 'Best Performance',
     description: 'A single leading or supporting performance in a released title.',
     criteria: 'Name the performer and the role, e.g. "A. Nolan as Vesper".',
   },
   {
     id: 'independent',
+    order: 7,
     name: 'Independent Game of the Year',
     description: 'The finest work from a studio operating without a publisher.',
   },
   {
     id: 'ongoing',
+    order: 8,
     name: 'Best Ongoing Game',
     description: 'A live title that grew meaningfully over the past twelve months.',
   },
   {
     id: 'debut',
+    order: 9,
     name: 'Debut Studio of the Year',
     description: 'A first commercial release that announced a studio worth watching.',
     locked: true,
   },
   {
     id: 'community',
+    order: 10,
     name: 'Community Choice',
     description: 'The people\u2019s pick, tallied from the open floor.',
     maxSuggestions: 1,

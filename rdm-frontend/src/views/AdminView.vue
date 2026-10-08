@@ -14,29 +14,15 @@ const checking = ref(true)
 const allowed = ref(false)
 const tab = ref<'suggestions' | 'categories'>('suggestions')
 
-/* --- suggestions (read-only) --------------------------------------------- */
-
-const suggestionsStatus = ref<FetchStatus>('idle')
-const suggestionsError = ref<string | null>(null)
-const suggestions = ref<NominationSuggestionRich[]>([])
-
-async function loadSuggestions(): Promise<void> {
-  suggestionsStatus.value = 'loading'
-  suggestionsError.value = null
-  try {
-    suggestions.value = await adminApi.listAllSuggestions()
-    suggestionsStatus.value = 'ready'
-  } catch (error) {
-    suggestionsError.value = (error as Error).message
-    suggestionsStatus.value = 'error'
-  }
-}
-
 /* --- categories (CRUD) ---------------------------------------------------- */
 
 const categoriesStatus = ref<FetchStatus>('idle')
 const categoriesError = ref<string | null>(null)
 const categories = ref<Category[]>([])
+const openCategoryIds = reactive<Record<string, boolean>>({})
+const categorySuggestions = reactive<Record<string, NominationSuggestionRich[]>>({})
+const categorySuggestionsStatus = reactive<Record<string, FetchStatus>>({})
+const categorySuggestionsError = reactive<Record<string, string | null>>({})
 
 async function loadCategories(): Promise<void> {
   categoriesStatus.value = 'loading'
@@ -53,8 +39,25 @@ async function loadCategories(): Promise<void> {
   }
 }
 
+async function toggleCategory(category: Category): Promise<void> {
+  const key = String(category.id)
+  openCategoryIds[key] = !openCategoryIds[key]
+  if (!openCategoryIds[key] || categorySuggestionsStatus[key] === 'ready') return
+
+  categorySuggestionsStatus[key] = 'loading'
+  categorySuggestionsError[key] = null
+  try {
+    const payload = await awardsApi.listCategorySuggestions(category.id)
+    categorySuggestions[key] = Array.isArray(payload) ? payload : (payload.suggestions ?? [])
+    categorySuggestionsStatus[key] = 'ready'
+  } catch (error) {
+    categorySuggestionsError[key] = (error as Error).message
+    categorySuggestionsStatus[key] = 'error'
+  }
+}
+
 function emptyDraft(): CategoryInput {
-  return { name: '', description: '', criteria: '', locked: false, maxSuggestions: undefined }
+  return { name: '', order: 0, description: '', criteria: '', locked: false, maxSuggestions: undefined }
 }
 
 const formOpen = ref(false)
@@ -125,7 +128,7 @@ onMounted(async () => {
   allowed.value = await refreshAdminStatus()
   checking.value = false
   if (allowed.value) {
-    await Promise.all([loadSuggestions(), loadCategories()])
+    await loadCategories()
   }
 })
 </script>
@@ -175,39 +178,74 @@ onMounted(async () => {
       <!-- ---------------------------------------------------------------- -->
       <section v-if="tab === 'suggestions'" class="panel">
         <div class="panel__head">
-          <h2 class="panel__title">All suggestions</h2>
-          <UiButton variant="ghost" size="sm" :disabled="suggestionsStatus === 'loading'" @click="loadSuggestions">
-            Refresh
-          </UiButton>
+          <h2 class="panel__title">Suggestions by category</h2>
+          <p class="panel__hint">Open a category to load its suggestions.</p>
         </div>
 
-        <StatusNote v-if="suggestionsStatus === 'error'" tone="error" title="Couldn't load suggestions" :message="suggestionsError" />
-        <p v-else-if="suggestionsStatus === 'loading'" class="loading">Loading…</p>
-        <p v-else-if="suggestions.length === 0" class="empty">No suggestions submitted yet.</p>
+        <p v-if="categoriesStatus === 'loading'" class="loading">Loading categories…</p>
+        <StatusNote v-else-if="categoriesStatus === 'error'" tone="error" title="Couldn't load categories" :message="categoriesError" />
+        <p v-else-if="categories.length === 0" class="empty">No categories yet.</p>
 
-        <table v-else class="table">
-          <thead>
-            <tr>
-              <th>Category</th>
-              <th>Suggestion</th>
-              <th>Submitted by</th>
-              <th>Updated</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(row, index) in suggestions" :key="`${row.suggestion.id}-${index}`">
-              <td class="mono">{{ row.suggestion.categoryId }}</td>
-              <td>{{ row.suggestion.text }}</td>
-              <td>
-                <span class="user">
-                  <img v-if="row.user.avatarUrl" class="user__avatar" :src="row.user.avatarUrl" alt="" />
-                  <span class="user__name">{{ row.user.displayName || row.user.username }}</span>
+        <div v-else class="category-suggestions">
+          <article v-for="category in categories" :key="String(category.id)" class="category-suggestions__item">
+            <button
+              type="button"
+              class="category-suggestions__head"
+              :aria-expanded="openCategoryIds[String(category.id)] ?? false"
+              @click="toggleCategory(category)"
+            >
+              <span>
+                <strong>{{ category.name }}</strong>
+                <span class="category-suggestions__meta">
+                  {{ categorySuggestionsStatus[String(category.id)] === 'ready'
+                    ? `${categorySuggestions[String(category.id)]?.length ?? 0} suggestions`
+                    : 'Load suggestions' }}
                 </span>
-              </td>
-              <td class="mono">{{ formatDate(row.suggestion.updatedAt) }}</td>
-            </tr>
-          </tbody>
-        </table>
+              </span>
+              <span class="chevron" :class="{ 'chevron--open': openCategoryIds[String(category.id)] }">⌄</span>
+            </button>
+
+            <div v-if="openCategoryIds[String(category.id)]" class="category-suggestions__body">
+              <p v-if="categorySuggestionsStatus[String(category.id)] === 'loading'" class="loading">Loading…</p>
+              <StatusNote
+                v-else-if="categorySuggestionsStatus[String(category.id)] === 'error'"
+                tone="error"
+                title="Couldn't load suggestions"
+                :message="categorySuggestionsError[String(category.id)]"
+              />
+              <p
+                v-else-if="(categorySuggestions[String(category.id)]?.length ?? 0) === 0"
+                class="empty"
+              >
+                No suggestions submitted yet.
+              </p>
+              <table v-else class="table">
+                <thead>
+                  <tr>
+                    <th>Suggestion</th>
+                    <th>Submitted by</th>
+                    <th>Updated</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="row in categorySuggestions[String(category.id)]"
+                    :key="String(row.suggestion.id)"
+                  >
+                    <td>{{ row.suggestion.text }}</td>
+                    <td>
+                      <span class="user">
+                        <img v-if="row.user.avatarUrl" class="user__avatar" :src="row.user.avatarUrl" alt="" />
+                        <span class="user__name">{{ row.user.displayName || row.user.username }}</span>
+                      </span>
+                    </td>
+                    <td class="mono">{{ formatDate(row.suggestion.updatedAt) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </div>
       </section>
 
       <!-- ---------------------------------------------------------------- -->
@@ -386,6 +424,12 @@ onMounted(async () => {
   font-weight: 600;
 }
 
+.panel__hint {
+  margin: 0;
+  color: var(--faint);
+  font-size: 0.8rem;
+}
+
 .panel__actions {
   display: flex;
   gap: 0.5rem;
@@ -464,9 +508,69 @@ onMounted(async () => {
 
 .table__actions {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
   gap: 0.4rem;
   white-space: nowrap;
+}
+
+.table td.table__actions {
+  vertical-align: middle;
+}
+
+.category-suggestions {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.category-suggestions__item {
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.category-suggestions__head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  border: 0;
+  background: rgba(231, 236, 247, 0.02);
+  color: var(--platinum);
+  text-align: left;
+  cursor: pointer;
+}
+
+.category-suggestions__head:hover {
+  background: rgba(231, 236, 247, 0.05);
+}
+
+.category-suggestions__meta {
+  margin-left: 0.7rem;
+  color: var(--faint);
+  font-size: 0.78rem;
+  font-weight: 400;
+}
+
+.category-suggestions__body {
+  padding: 0 1rem 1rem;
+  border-top: 1px solid var(--hairline);
+}
+
+.category-suggestions__body .table {
+  margin-top: 0.5rem;
+}
+
+.chevron {
+  color: var(--muted);
+  font-size: 1.1rem;
+  transition: transform 0.2s var(--ease);
+}
+
+.chevron--open {
+  transform: rotate(180deg);
 }
 
 .user {

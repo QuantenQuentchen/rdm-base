@@ -23,6 +23,8 @@ export type UserReply = User
 export interface Category {
   id: EntityId
   name: string
+  order: number
+    /** Optional longer description, shown when the panel is open. */
   description?: string
   /** One line of "what counts" guidance, shown when the panel is open. */
   criteria?: string
@@ -74,6 +76,10 @@ export interface NominationSuggestionRich {
 }
 
 export interface ViewAllSuggestionsResponse {
+  suggestions: NominationSuggestionRich[]
+}
+
+export interface CategorySuggestionsResponse {
   suggestions: NominationSuggestionRich[]
 }
 

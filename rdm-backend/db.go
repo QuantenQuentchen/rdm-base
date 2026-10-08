@@ -305,7 +305,7 @@ func (db *DB) getCategories() ([]Category, error) {
 
 	err := db.db.Select(
 		&categories,
-		"SELECT * FROM categories ORDER BY \"order\" ASC",
+		"SELECT * FROM categories ORDER BY \"order\" ",
 	)
 	if err != nil {
 		return nil, err
@@ -345,6 +345,26 @@ func (db *DB) getSuggestionsFor(
 		   AND nominator_id = ?`,
 		categoryID,
 		userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return suggestions, nil
+}
+
+func (db *DB) getAllSuggestionsForCategory(
+	categoryID int64,
+) ([]NominationSuggestion, error) {
+	var suggestions []NominationSuggestion
+
+	err := db.db.Select(
+		&suggestions,
+		`SELECT *
+						 FROM suggestions
+						 WHERE category_id = ?
+						 ORDER BY updated_at , id `,
+		categoryID,
 	)
 	if err != nil {
 		return nil, err

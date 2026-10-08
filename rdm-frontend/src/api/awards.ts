@@ -1,6 +1,14 @@
 import api from './client'
 import config from '../config'
-import type { Category, EntityId, ListPayload, Suggestion, SuggestionDraft } from '../types'
+import type {
+  Category,
+  CategorySuggestionsResponse,
+  EntityId,
+  ListPayload,
+  NominationSuggestionRich,
+  Suggestion,
+  SuggestionDraft,
+} from '../types'
 import type { RequestOptions } from './client'
 
 export const awardsApi = {
@@ -11,6 +19,13 @@ export const awardsApi = {
   /** Every suggestion the signed-in user has made, across all categories. */
   listMySuggestions(options?: RequestOptions) {
     return api.get<ListPayload<Suggestion>>(config.endpoints.mySuggestions, options)
+  },
+
+  listCategorySuggestions(categoryId: EntityId, options?: RequestOptions) {
+    return api.get<CategorySuggestionsResponse | NominationSuggestionRich[]>(
+      config.endpoints.categorySuggestions(categoryId),
+      options,
+    )
   },
 
   /**

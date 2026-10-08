@@ -95,6 +95,22 @@ export async function mockRequest<T>(path: string, req: MockRequest): Promise<T>
     return suggestions.map((item) => ({ ...item })) as T
   }
 
+  const categorySuggestionsMatch = new RegExp(
+    `^GET ${escapeRegex(config.endpoints.categories)}/([^/]+)/suggestions$`,
+  ).exec(route)
+  if (categorySuggestionsMatch) {
+    requireAuth(req)
+    const categoryId = decodeURIComponent(categorySuggestionsMatch[1] ?? '')
+    const category = categories.find((item) => String(item.id) === categoryId)
+    if (!category) throw new ApiError('That category no longer exists.', { status: 404 })
+
+    return {
+      suggestions: suggestions
+        .filter((item) => String(item.categoryId) === categoryId)
+        .map((suggestion) => ({ suggestion: { ...suggestion }, user: mockUser })),
+    } as T
+  }
+
   if (route === `GET ${config.endpoints.adminViewSuggestions}`) {
     requireAuth(req)
     const rich: NominationSuggestionRich[] = suggestions.map((suggestion) => ({

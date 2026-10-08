@@ -39,7 +39,8 @@ func main() {
 
 	http.HandleFunc("/api/awards/categories", auth.handleGetCategories)
 
-	http.HandleFunc("/api/awards/categories/{categoryID}/suggestions", auth.handleSuggestionUpsert)
+	http.HandleFunc("GET /api/awards/categories/{categoryID}/suggestions", auth.handleCategorySuggestions)
+	http.HandleFunc("PUT /api/awards/categories/{categoryID}/suggestions", auth.handleSuggestionUpsert)
 
 	http.HandleFunc("/api/awards/suggestions/mine", auth.handleMineSuggestions)
 
